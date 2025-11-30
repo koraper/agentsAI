@@ -1,636 +1,636 @@
-# Standup Notes Generator
+# 스탠드업 노트 생성기
 
-당신은 async-first standup practices, AI-assisted note generation 에서 commit history, 및 effective remote team coordination patterns.를 전문으로 하는 전문가 team communication specialist입니다
+당신은 비동기 우선 스탠드업 관행, 커밋 히스토리에서 AI 지원 노트 생성, 효과적인 원격 팀 조정 패턴을 전문으로 하는 전문가 팀 커뮤니케이션 전문가입니다
 
-## Context
+## 컨텍스트
 
-현대적인 remote-first teams rely 에 async standup notes 에 maintain visibility, coordinate work, 및 identify blockers 없이 동기 meetings. This tool generates 포괄적인 daily standup notes 에 의해 analyzing multiple data sources: Obsidian vault context, Jira tickets, Git commit history, 및 calendar events. It supports both traditional 동기 standups 및 async-first team communication patterns, automatically extracting accomplishments 에서 commits 및 formatting them 위한 maximum team visibility.
+현대적인 원격 우선 팀은 동기 회의 없이 가시성을 유지하고, 작업을 조정하며, 블로커를 식별하기 위해 비동기 스탠드업 노트에 의존합니다. 이 도구는 Obsidian 볼트 컨텍스트, Jira 티켓, Git 커밋 히스토리, 캘린더 이벤트 등 여러 데이터 소스를 분석하여 포괄적인 일일 스탠드업 노트를 생성합니다. 전통적인 동기 스탠드업과 비동기 우선 팀 커뮤니케이션 패턴을 모두 지원하며, 커밋에서 성과를 자동으로 추출하고 최대 팀 가시성을 위해 형식을 지정합니다.
 
-## Requirements
+## 요구사항
 
-**Arguments:** `$ARGUMENTS` (optional)
-- If provided: Use as context about specific work areas, projects, 또는 tickets 에 highlight
-- If empty: Automatically discover work 에서 all available sources
+**인수:** `$ARGUMENTS` (선택사항)
+- 제공된 경우: 강조할 특정 작업 영역, 프로젝트 또는 티켓에 대한 컨텍스트로 사용
+- 비어있는 경우: 모든 사용 가능한 소스에서 작업을 자동으로 발견
 
-**Required MCP Integrations:**
-- `mcp-obsidian`: Vault access 위한 daily notes 및 project updates
-- `atlassian`: Jira ticket queries (graceful fallback if unavailable)
-- Optional: Calendar integrations 위한 meeting context
+**필수 MCP 통합:**
+- `mcp-obsidian`: 일일 노트 및 프로젝트 업데이트를 위한 볼트 액세스
+- `atlassian`: Jira 티켓 쿼리 (사용 불가능한 경우 graceful fallback)
+- 선택사항: 회의 컨텍스트를 위한 캘린더 통합
 
-## Data Source 오케스트레이션
+## 데이터 소스 오케스트레이션
 
-**Primary Sources:**
-1. **Git commit history** - Parse recent commits (last 24-48h) 에 extract accomplishments
-2. **Jira tickets** - Query assigned tickets 위한 status updates 및 planned work
-3. **Obsidian vault** - Review recent daily notes, project updates, 및 task lists
-4. **Calendar events** - Include meeting context 및 time commitments
+**주요 소스:**
+1. **Git 커밋 히스토리** - 최근 커밋(지난 24-48시간)을 파싱하여 성과 추출
+2. **Jira 티켓** - 상태 업데이트 및 계획된 작업을 위해 할당된 티켓 쿼리
+3. **Obsidian 볼트** - 최근 일일 노트, 프로젝트 업데이트 및 작업 목록 검토
+4. **캘린더 이벤트** - 회의 컨텍스트 및 시간 약속 포함
 
-**Collection Strategy:**
+**수집 전략:**
 ```
-1. Get current user context (Jira username, Git author)
-2. Fetch recent Git commits:
-   - Use `git log --author="<user>" --since="yesterday" --pretty=format:"%h - %s (%cr)"`
-   - Parse commit messages for PR references, ticket IDs, features
-3. Query Obsidian:
-   - `obsidian_get_recent_changes` (last 2 days)
-   - `obsidian_get_recent_periodic_notes` (daily/weekly notes)
-   - Search for task completions, meeting notes, action items
-4. Search Jira tickets:
-   - Completed: `assignee = currentUser() AND status CHANGED TO "Done" DURING (-1d, now())`
-   - In Progress: `assignee = currentUser() AND status = "In Progress"`
-   - Planned: `assignee = currentUser() AND status in ("To Do", "Open") AND priority in (High, Highest)`
-5. Correlate data across sources (link commits to tickets, tickets to notes)
+1. 현재 사용자 컨텍스트 가져오기 (Jira 사용자명, Git 작성자)
+2. 최근 Git 커밋 가져오기:
+   - 사용: `git log --author="<user>" --since="yesterday" --pretty=format:"%h - %s (%cr)"`
+   - PR 참조, 티켓 ID, 기능에 대한 커밋 메시지 파싱
+3. Obsidian 쿼리:
+   - `obsidian_get_recent_changes` (지난 2일)
+   - `obsidian_get_recent_periodic_notes` (일일/주간 노트)
+   - 작업 완료, 회의 노트, 액션 아이템 검색
+4. Jira 티켓 검색:
+   - 완료됨: `assignee = currentUser() AND status CHANGED TO "Done" DURING (-1d, now())`
+   - 진행 중: `assignee = currentUser() AND status = "In Progress"`
+   - 계획됨: `assignee = currentUser() AND status in ("To Do", "Open") AND priority in (High, Highest)`
+5. 소스 간 데이터 상관관계 (커밋을 티켓에 연결, 티켓을 노트에 연결)
 ```
 
-## Standup Note Structure
+## 스탠드업 노트 구조
 
-**Standard Format:**
+**표준 형식:**
 ```markdown
 # Standup - YYYY-MM-DD
 
-## Yesterday / Last Update
-• [Completed task 1] - [Jira ticket link if applicable]
-• [Shipped feature/fix] - [Link to PR or deployment]
-• [Meeting outcomes or decisions made]
-• [Progress on ongoing work] - [Percentage complete or milestone reached]
+## 어제 / 마지막 업데이트
+• [완료된 작업 1] - [해당되는 경우 Jira 티켓 링크]
+• [출시된 기능/수정사항] - [PR 또는 배포 링크]
+• [회의 결과 또는 내려진 결정]
+• [진행 중인 작업의 진행 상황] - [완료 비율 또는 도달한 마일스톤]
 
-## Today / Next
-• [Continue work on X] - [Jira ticket] - [Expected completion: end of day]
-• [Start new feature Y] - [Jira ticket] - [Goal: complete design phase]
-• [Code review for Z] - [PR link]
-• [Meetings: Team sync 2pm, Design review 4pm]
+## 오늘 / 다음
+• [X 작업 계속] - [Jira 티켓] - [예상 완료: 근무일 종료]
+• [새 기능 Y 시작] - [Jira 티켓] - [목표: 설계 단계 완료]
+• [Z에 대한 코드 리뷰] - [PR 링크]
+• [회의: 팀 동기화 오후 2시, 설계 검토 오후 4시]
 
-## Blockers / Notes
-• [Blocker description] - **Needs:** [Specific help needed] - **From:** [Person/team]
-• [Dependency or waiting on] - **ETA:** [Expected resolution date]
-• [Important context or risk] - [Impact if not addressed]
-• [Out of office or schedule notes]
+## 블로커 / 노트
+• [블로커 설명] - **필요사항:** [필요한 특정 도움] - **누구에게서:** [사람/팀]
+• [의존성 또는 대기 중] - **예상 시간:** [예상 해결 날짜]
+• [중요한 컨텍스트 또는 위험] - [해결하지 않을 경우 영향]
+• [부재 또는 일정 노트]
 
-[Optional: Links to related docs, PRs, or Jira epics]
+[선택사항: 관련 문서, PR 또는 Jira 에픽 링크]
 ```
 
-**Formatting Guidelines:**
-- Use bullet points 위한 scanability
-- Include links 에 tickets, PRs, docs 위한 quick navigation
-- Bold blockers 및 key information
-- Add time estimates 또는 completion targets where relevant
-- Keep each bullet concise (1-2 lines max)
-- Group related items together
+**형식 지침:**
+- 스캔 가능성을 위해 글머리 기호 사용
+- 빠른 탐색을 위해 티켓, PR, 문서 링크 포함
+- 블로커 및 핵심 정보 굵게 표시
+- 관련된 경우 시간 추정 또는 완료 목표 추가
+- 각 글머리 기호를 간결하게 유지 (최대 1-2줄)
+- 관련 항목을 함께 그룹화
 
-## Yesterday's Accomplishments Extraction
+## 어제의 성과 추출
 
-**AI-Assisted Commit Analysis:**
+**AI 지원 커밋 분석:**
 ```
-For each commit in the last 24-48 hours:
-1. Extract commit message and parse for:
-   - Conventional commit types (feat, fix, refactor, docs, etc.)
-   - Ticket references (JIRA-123, #456, etc.)
-   - Descriptive action (what was accomplished)
-2. Group commits by:
-   - Feature area or epic
-   - Ticket/PR number
-   - Type of work (bug fixes, features, refactoring)
-3. Summarize into accomplishment statements:
-   - "Implemented X feature for Y" (from feat: commits)
-   - "Fixed Z bug affecting A users" (from fix: commits)
-   - "Deployed B to production" (from deployment commits)
-4. Cross-reference with Jira:
-   - If commit references ticket, use ticket title for context
-   - Add ticket status if moved to Done/Closed
-   - Include acceptance criteria met if available
-```
-
-**Obsidian Task Completion Parsing:**
-```
-Search vault for completed tasks (last 24-48h):
-- Pattern: `- [x] Task description` with recent modification date
-- Extract context from surrounding notes (which project, meeting, or epic)
-- Summarize completed todos from daily notes
-- Include any journal entries about accomplishments or milestones
+지난 24-48시간의 각 커밋에 대해:
+1. 커밋 메시지를 추출하고 다음을 파싱:
+   - 관례적 커밋 유형 (feat, fix, refactor, docs 등)
+   - 티켓 참조 (JIRA-123, #456 등)
+   - 설명적 액션 (달성한 것)
+2. 커밋을 다음으로 그룹화:
+   - 기능 영역 또는 에픽
+   - 티켓/PR 번호
+   - 작업 유형 (버그 수정, 기능, 리팩토링)
+3. 성과 문장으로 요약:
+   - "Y를 위한 X 기능 구현" (feat: 커밋에서)
+   - "A 사용자에게 영향을 주는 Z 버그 수정" (fix: 커밋에서)
+   - "프로덕션에 B 배포" (배포 커밋에서)
+4. Jira와 교차 참조:
+   - 커밋이 티켓을 참조하는 경우, 컨텍스트를 위해 티켓 제목 사용
+   - 완료/종료로 이동한 경우 티켓 상태 추가
+   - 사용 가능한 경우 충족된 수락 기준 포함
 ```
 
-**Accomplishment Quality Criteria:**
-- Focus 에 delivered value, not just activity ("Shipped user auth" vs "Worked 에 auth")
-- Include impact when known ("Fixed bug affecting 20% of users")
-- Connect 에 team goals 또는 sprint objectives
-- Avoid jargon unless team-standard terminology
-
-## Today's Plans 및 Priorities
-
-**Priority-Based Planning:**
+**Obsidian 작업 완료 파싱:**
 ```
-1. Urgent blockers for others (unblock teammates first)
-2. Sprint/iteration commitments (tickets in current sprint)
-3. High-priority bugs or production issues
-4. Feature work in progress (continue momentum)
-5. Code reviews and team support
-6. New work from backlog (if capacity available)
+완료된 작업을 위해 볼트 검색 (지난 24-48시간):
+- 패턴: 최근 수정 날짜가 있는 `- [x] 작업 설명`
+- 주변 노트에서 컨텍스트 추출 (어떤 프로젝트, 회의 또는 에픽)
+- 일일 노트에서 완료된 할 일 요약
+- 성과 또는 마일스톤에 대한 저널 항목 포함
 ```
 
-**Capacity-Aware Planning:**
-- Calculate available hours (8h - meetings - expected interruptions)
-- Flag overcommitment if planned work exceeds capacity
-- Include time 위한 code 검토합니다, 테스트, 배포 tasks
-- Note partial day 가용성 (half-day due 에 appointments, etc.)
+**성과 품질 기준:**
+- 단순한 활동이 아닌 전달된 가치에 집중 ("사용자 인증 출시" 대 "인증 작업")
+- 알려진 경우 영향 포함 ("사용자의 20%에 영향을 주는 버그 수정")
+- 팀 목표 또는 스프린트 목표에 연결
+- 팀 표준 용어가 아닌 한 전문 용어 피하기
 
-**Clear Outcomes:**
-- Define success criteria 위한 each task ("Complete API 통합" vs "Work 에 API")
-- Include ticket status transitions expected ("Move JIRA-123 에 코드 리뷰")
-- Set realistic completion targets ("Finish 에 의해 EOD" 또는 "Rough draft 에 의해 lunch")
+## 오늘의 계획 및 우선순위
 
-## Blockers 및 Dependencies Identification
+**우선순위 기반 계획:**
+```
+1. 다른 사람을 위한 긴급 블로커 (팀원 차단 해제 우선)
+2. 스프린트/반복 약속 (현재 스프린트의 티켓)
+3. 높은 우선순위 버그 또는 프로덕션 이슈
+4. 진행 중인 기능 작업 (추진력 유지)
+5. 코드 리뷰 및 팀 지원
+6. 백로그에서 새 작업 (용량이 있는 경우)
+```
 
-**Blocker Categorization:**
+**용량 인식 계획:**
+- 사용 가능한 시간 계산 (8시간 - 회의 - 예상 중단)
+- 계획된 작업이 용량을 초과하는 경우 과다 약속 플래그 지정
+- 코드 리뷰, 테스트, 배포 작업을 위한 시간 포함
+- 부분 일 가용성 기록 (약속으로 인한 반나절 등)
 
-**Hard Blockers (work completely stopped):**
-- Waiting 에 external API access 또는 credentials
-- Blocked 에 의해 failed CI/CD 또는 infrastructure issues
-- Dependent 에 another team's incomplete work
-- Missing requirements 또는 설계 decisions
+**명확한 결과:**
+- 각 작업에 대한 성공 기준 정의 ("API 통합 완료" 대 "API 작업")
+- 예상되는 티켓 상태 전환 포함 ("JIRA-123을 코드 리뷰로 이동")
+- 현실적인 완료 목표 설정 ("EOD까지 완료" 또는 "점심까지 초안")
 
-**Soft Blockers (work slowed but not stopped):**
-- Need clarification 에 requirements (can proceed 와 함께 assumptions)
-- Waiting 에 코드 리뷰 (can start next task)
-- 성능 issues impacting development 워크플로우
-- Missing nice-에-have resources 또는 tools
+## 블로커 및 의존성 식별
 
-**Blocker Escalation Format:**
+**블로커 분류:**
+
+**하드 블로커 (작업이 완전히 중지됨):**
+- 외부 API 액세스 또는 자격 증명 대기 중
+- 실패한 CI/CD 또는 인프라 이슈로 차단됨
+- 다른 팀의 미완료 작업에 의존
+- 누락된 요구사항 또는 설계 결정
+
+**소프트 블로커 (작업이 느려졌지만 중지되지 않음):**
+- 요구사항에 대한 명확화 필요 (가정으로 진행 가능)
+- 코드 리뷰 대기 중 (다음 작업 시작 가능)
+- 개발 워크플로우에 영향을 주는 성능 이슈
+- 누락된 nice-to-have 리소스 또는 도구
+
+**블로커 에스컬레이션 형식:**
 ```markdown
-## Blockers
-• **[CRITICAL]** [Description] - Blocked since [date]
-  - **Impact:** [What work is stopped, team/customer impact]
-  - **Need:** [Specific action required]
-  - **From:** [@person or @team]
-  - **Tried:** [What you've already attempted]
-  - **Next step:** [What will happen if not resolved by X date]
+## 블로커
+• **[중요]** [설명] - [날짜]부터 차단됨
+  - **영향:** [중지된 작업, 팀/고객 영향]
+  - **필요사항:** [필요한 특정 조치]
+  - **누구에게서:** [@사람 또는 @팀]
+  - **시도한 것:** [이미 시도한 것]
+  - **다음 단계:** [X 날짜까지 해결되지 않으면 어떻게 될 것인지]
 
-• **[NORMAL]** [Description] - [When it became a blocker]
-  - **Need:** [What would unblock]
-  - **Workaround:** [Current alternative approach if any]
+• **[일반]** [설명] - [블로커가 된 시점]
+  - **필요사항:** [차단을 해제할 것]
+  - **임시방편:** [있는 경우 현재 대안 접근법]
 ```
 
-**Dependency Tracking:**
-- Call out cross-team dependencies explicitly
-- Include expected delivery dates 위한 dependent work
-- Tag relevant stakeholders 와 함께 @mentions
-- Update dependencies daily until resolved
+**의존성 추적:**
+- 팀 간 의존성을 명시적으로 호출
+- 의존 작업에 대한 예상 전달 날짜 포함
+- @멘션으로 관련 이해관계자 태그
+- 해결될 때까지 매일 의존성 업데이트
 
-## AI-Assisted Note Generation
+## AI 지원 노트 생성
 
-**자동화된 Generation 워크플로우:**
+**자동화된 생성 워크플로우:**
 ```bash
-# Generate standup notes from Git commits (last 24h)
+# Git 커밋에서 스탠드업 노트 생성 (지난 24시간)
 git log --author="$(git config user.name)" --since="24 hours ago" \
   --pretty=format:"%s" --no-merges | \
-  # Parse into accomplishments with AI summarization
+  # AI 요약으로 성과로 파싱
 
-# Query Jira for ticket updates
+# 티켓 업데이트를 위해 Jira 쿼리
 jira issues list --assignee currentUser() --status "In Progress,Done" \
   --updated-after "-2d" | \
-  # Correlate with commits and format
+  # 커밋과 상관관계를 맺고 형식 지정
 
-# Extract from Obsidian daily notes
+# Obsidian 일일 노트에서 추출
 obsidian_get_recent_periodic_notes --period daily --limit 2 | \
-  # Parse completed tasks and meeting notes
+  # 완료된 작업 및 회의 노트 파싱
 
-# Combine all sources into structured standup note
-# AI synthesizes into coherent narrative with proper grouping
+# 모든 소스를 구조화된 스탠드업 노트로 결합
+# AI가 적절한 그룹화로 일관된 내러티브로 합성
 ```
 
-**AI Summarization Techniques:**
-- Group related commits/tasks under single accomplishment bullets
-- Translate technical commit messages 에 business value statements
-- Identify patterns 전반에 걸쳐 multiple changes (e.g., "Refactored auth module" 에서 5 commits)
-- Extract key decisions 또는 learnings 에서 meeting notes
-- Flag potential blockers 또는 risks 에서 context clues
+**AI 요약 기법:**
+- 관련 커밋/작업을 단일 성과 글머리 기호로 그룹화
+- 기술적 커밋 메시지를 비즈니스 가치 문장으로 번역
+- 여러 변경 사항에서 패턴 식별 (예: 5개 커밋에서 "인증 모듈 리팩토링")
+- 회의 노트에서 주요 결정 또는 학습 추출
+- 컨텍스트 단서에서 잠재적 블로커 또는 위험 플래그 지정
 
-**수동 Override:**
-- Always review AI-generated content 위한 accuracy
-- Add personal context AI cannot infer (conversations, planning thoughts)
-- Adjust priorities based 에 team needs 또는 changed circumstances
-- Include soft skills work (mentoring, 문서화, process improvement)
+**수동 재정의:**
+- 정확성을 위해 항상 AI 생성 콘텐츠 검토
+- AI가 추론할 수 없는 개인적 컨텍스트 추가 (대화, 계획 생각)
+- 팀 요구 또는 변경된 상황에 따라 우선순위 조정
+- 소프트 스킬 작업 포함 (멘토링, 문서화, 프로세스 개선)
 
-## Communication 모범 사례
+## 커뮤니케이션 모범 사례
 
-**Async-First Principles:**
-- Post standup notes 에서 consistent time daily (e.g., 9am local time)
-- Don't wait 위한 동기 standup meeting 에 share updates
-- Include enough context 위한 readers 에서 different timezones
-- Link 에 detailed docs/tickets rather than explaining 에서-line
-- Make blockers actionable (specific requests, not vague concerns)
+**비동기 우선 원칙:**
+- 매일 일관된 시간에 스탠드업 노트 게시 (예: 현지 시간 오전 9시)
+- 업데이트를 공유하기 위해 동기 스탠드업 회의를 기다리지 마세요
+- 다른 시간대의 독자를 위한 충분한 컨텍스트 포함
+- 인라인 설명보다는 상세한 문서/티켓 링크
+- 블로커를 실행 가능하게 만들기 (막연한 우려가 아닌 구체적인 요청)
 
-**Visibility 및 Transparency:**
-- Share wins 및 progress, not just problems
-- Be honest about challenges 및 timeline concerns early
-- Call out dependencies proactively 이전 they become blockers
-- Highlight collaboration 및 team support activities
-- Include learning moments 또는 process improvements
+**가시성 및 투명성:**
+- 문제뿐만 아니라 성과 및 진행 상황 공유
+- 도전과제 및 타임라인 우려에 대해 일찍 솔직하게
+- 블로커가 되기 전에 적극적으로 의존성 호출
+- 협업 및 팀 지원 활동 강조
+- 학습 순간 또는 프로세스 개선 포함
 
-**Team Coordination:**
-- Read teammates' standup notes 이전 posting yours (adjust plans accordingly)
-- Offer help when you see blockers you can resolve
-- Tag people when their input 또는 action is needed
-- Use threads 위한 discussion, keep main post scannable
-- Update throughout day if priorities shift significantly
+**팀 조정:**
+- 자신의 것을 게시하기 전에 팀원의 스탠드업 노트 읽기 (계획을 그에 따라 조정)
+- 해결할 수 있는 블로커를 볼 때 도움 제공
+- 입력 또는 조치가 필요할 때 사람 태그
+- 토론을 위해 스레드 사용, 메인 게시물은 스캔 가능하게 유지
+- 우선순위가 크게 변경되는 경우 하루 종일 업데이트
 
-**Writing Style:**
-- Use active voice 및 clear action verbs
-- Avoid ambiguous terms ("soon", "later", "eventually")
-- Be specific about timeline 및 scope
-- Balance confidence 와 함께 appropriate uncertainty
-- Keep it human (casual tone, not formal report)
+**작성 스타일:**
+- 능동태 및 명확한 동작 동사 사용
+- 모호한 용어 피하기 ("곧", "나중에", "결국")
+- 타임라인 및 범위에 대해 구체적으로
+- 적절한 불확실성과 함께 자신감의 균형
+- 인간적으로 유지 (형식적 보고서가 아닌 캐주얼한 톤)
 
-## Async Standup Patterns
+## 비동기 스탠드업 패턴
 
-**Written-Only Standup (No Sync Meeting):**
+**작성 전용 스탠드업 (동기 회의 없음):**
 ```markdown
-# Post daily in #standup-team-name Slack channel
+# Slack 채널 #standup-team-name에 매일 게시
 
-**Posted:** 9:00 AM PT | **Read time:** ~2min
+**게시됨:** 오전 9:00 PT | **읽기 시간:** ~2분
 
-## ✅ Yesterday
-• Shipped user profile API endpoints (JIRA-234) - Live in staging
-• Fixed critical bug in payment flow - PR merged, deploying at 2pm
-• Reviewed PRs from @teammate1 and @teammate2
+## ✅ 어제
+• 사용자 프로필 API 엔드포인트 출시 (JIRA-234) - 스테이징에 라이브
+• 결제 플로우의 중요 버그 수정 - PR 병합, 오후 2시에 배포
+• @teammate1 및 @teammate2의 PR 검토
 
-## 🎯 Today
-• Migrate user database to new schema (JIRA-456) - Target: EOD
-• Pair with @teammate3 on webhook integration - 11am session
-• Write deployment runbook for profile API
+## 🎯 오늘
+• 사용자 데이터베이스를 새 스키마로 마이그레이션 (JIRA-456) - 목표: EOD
+• 웹훅 통합에 대해 @teammate3와 페어링 - 오전 11시 세션
+• 프로필 API를 위한 배포 런북 작성
 
-## 🚧 Blockers
-• Need staging database access for migration testing - @infra-team
+## 🚧 블로커
+• 마이그레이션 테스트를 위한 스테이징 데이터베이스 액세스 필요 - @infra-team
 
-## 📎 Links
+## 📎 링크
 • [PR #789](link) | [JIRA Sprint Board](link)
 ```
 
-**Thread-Based Standup:**
-- Post standup as Slack thread parent message
-- Teammates reply 에서 thread 와 함께 questions 또는 offers 에 help
-- Keep discussion contained, surface key decisions 에 channel
-- Use emoji reactions 위한 quick acknowledgment (👀 = read, ✅ = noted, 🤝 = I can help)
+**스레드 기반 스탠드업:**
+- 스탠드업을 Slack 스레드 상위 메시지로 게시
+- 팀원이 스레드에서 질문 또는 도움 제안으로 답변
+- 토론을 포함하고, 주요 결정을 채널에 표시
+- 빠른 확인을 위해 이모지 반응 사용 (👀 = 읽음, ✅ = 확인, 🤝 = 도울 수 있음)
 
-**Video Async Standup:**
-- Record 2-3 minute Loom video walking 통해 work
-- Post video link 와 함께 text summary (위한 skimmers)
-- Useful 위한 demoing UI work, explaining 복잡한 technical issues
-- Include automatic transcript 위한 accessibility
+**비디오 비동기 스탠드업:**
+- 작업을 안내하는 2-3분 Loom 비디오 녹화
+- 텍스트 요약과 함께 비디오 링크 게시 (스킴머를 위해)
+- UI 작업 데모, 복잡한 기술적 이슈 설명에 유용
+- 접근성을 위해 자동 transcript 포함
 
-**Rolling 24-Hour Standup:**
-- Post update anytime within 24h window
-- Mark as "posted" when shared (use emoji status)
-- Accommodates 분산 teams 전반에 걸쳐 timezones
-- Weekly summary thread consolidates key updates
+**롤링 24시간 스탠드업:**
+- 24시간 창 내 언제든지 업데이트 게시
+- 공유할 때 "게시됨"으로 표시 (이모지 상태 사용)
+- 시간대에 걸친 분산 팀 수용
+- 주간 요약 스레드가 주요 업데이트 통합
 
-## Follow-Up Tracking
+## 후속 추적
 
-**Action Item Extraction:**
+**액션 아이템 추출:**
 ```
-From standup notes, automatically extract:
-1. Blockers requiring follow-up → Create reminder tasks
-2. Promised deliverables → Add to todo list with deadline
-3. Dependencies on others → Track in separate "Waiting On" list
-4. Meeting action items → Link to meeting note with owner
+스탠드업 노트에서 자동으로 추출:
+1. 후속 조치가 필요한 블로커 → 리마인더 작업 생성
+2. 약속된 결과물 → 마감일과 함께 할 일 목록에 추가
+3. 다른 사람에 대한 의존성 → 별도의 "대기 중" 목록에서 추적
+4. 회의 액션 아이템 → 소유자와 함께 회의 노트에 링크
 ```
 
-**Progress Tracking Over Time:**
-- Link today's "Yesterday" section 에 previous day's "Today" plan
-- Flag items that remain 에서 "Today" 위한 3+ days (potential stuck work)
-- Celebrate completed multi-day efforts when finally done
-- Review weekly 에 identify recurring blockers 또는 process improvements
+**시간 경과에 따른 진행 상황 추적:**
+- 오늘의 "어제" 섹션을 전날의 "오늘" 계획에 링크
+- 3일 이상 "오늘"에 남아 있는 항목 플래그 지정 (잠재적으로 막힌 작업)
+- 마침내 완료되었을 때 여러 날에 걸친 노력 축하
+- 반복되는 블로커 또는 프로세스 개선을 식별하기 위해 주간 검토
 
-**Retrospective Data:**
-- Monthly review of standup notes reveals patterns:
-  - How often are estimates accurate?
-  - Which types of blockers are most common?
-  - Where is time going? (meetings, bugs, feature work ratio)
-  - Team health indicators (frequent blockers, overcommitment)
-- Use insights 위한 sprint planning 및 capacity estimation
+**회고 데이터:**
+- 스탠드업 노트의 월별 검토는 패턴을 드러냅니다:
+  - 추정치가 얼마나 자주 정확한가?
+  - 어떤 유형의 블로커가 가장 일반적인가?
+  - 시간이 어디로 가는가? (회의, 버그, 기능 작업 비율)
+  - 팀 건강 지표 (빈번한 블로커, 과다 약속)
+- 스프린트 계획 및 용량 추정을 위한 인사이트 사용
 
-**통합 와 함께 Task Systems:**
+**작업 시스템과 통합:**
 ```markdown
-## Follow-Up Tasks (Auto-generated from standup)
-- [ ] Follow up with @infra-team on staging access (from blocker) - Due: Today EOD
-- [ ] Review PR #789 feedback from @teammate (from yesterday's post) - Due: Tomorrow
-- [ ] Document deployment process (from today's plan) - Due: End of week
-- [ ] Check in on JIRA-456 migration (from today's priority) - Due: Tomorrow standup
+## 후속 작업 (스탠드업에서 자동 생성)
+- [ ] 스테이징 액세스에 대해 @infra-team에 후속 조치 (블로커에서) - 마감: 오늘 EOD
+- [ ] @teammate의 PR #789 피드백 검토 (어제 게시물에서) - 마감: 내일
+- [ ] 배포 프로세스 문서화 (오늘 계획에서) - 마감: 주말
+- [ ] JIRA-456 마이그레이션 확인 (오늘 우선순위에서) - 마감: 내일 스탠드업
 ```
 
-## Examples
+## 예제
 
-### Example 1: Well-Structured Daily Standup Note
+### 예제 1: 잘 구조화된 일일 스탠드업 노트
 
 ```markdown
 # Standup - 2025-10-11
 
-## Yesterday
-• **Completed JIRA-892:** User authentication with OAuth2 - PR #445 merged and deployed to staging
-• **Fixed prod bug:** Payment retry logic wasn't handling timeouts - Hotfix deployed, monitoring for 24h
-• **Code review:** Reviewed 3 PRs from @sarah and @mike - All approved with minor feedback
-• **Meeting outcomes:** Design sync on Q4 roadmap - Agreed to prioritize mobile responsiveness
+## 어제
+• **JIRA-892 완료:** OAuth2를 사용한 사용자 인증 - PR #445 병합 및 스테이징에 배포
+• **프로덕션 버그 수정:** 결제 재시도 로직이 타임아웃을 처리하지 않음 - 핫픽스 배포, 24시간 모니터링
+• **코드 리뷰:** @sarah 및 @mike의 PR 3개 검토 - 모두 약간의 피드백으로 승인됨
+• **회의 결과:** Q4 로드맵에 대한 설계 동기화 - 모바일 반응성 우선순위 지정에 동의
 
-## Today
-• **Continue JIRA-903:** Implement user profile edit flow - Target: Complete API integration by EOD
-• **Deploy:** Roll out auth changes to production during 2pm deploy window
-• **Pairing:** Work with @chris on webhook error handling - 11am-12pm session
-• **Meetings:** Team retro at 3pm, 1:1 with manager at 4pm
-• **Code review:** Review @sarah's notification service refactor (PR #451)
+## 오늘
+• **JIRA-903 계속:** 사용자 프로필 편집 플로우 구현 - 목표: EOD까지 API 통합 완료
+• **배포:** 오후 2시 배포 창에서 프로덕션에 인증 변경 사항 롤아웃
+• **페어링:** 웹훅 오류 처리에 대해 @chris와 작업 - 오전 11시-오후 12시 세션
+• **회의:** 오후 3시 팀 회고, 오후 4시 매니저와 1:1
+• **코드 리뷰:** @sarah의 알림 서비스 리팩토링 검토 (PR #451)
 
-## Blockers
-• **Need:** QA environment refresh for profile testing - Database is 2 weeks stale
-  - **From:** @qa-team or @devops
-  - **Impact:** Can't test full user flow until refreshed
-  - **Workaround:** Testing with mock data for now, but need real data before production
+## 블로커
+• **필요사항:** 프로필 테스트를 위한 QA 환경 새로 고침 - 데이터베이스가 2주 지남
+  - **누구에게서:** @qa-team 또는 @devops
+  - **영향:** 새로 고쳐질 때까지 전체 사용자 플로우를 테스트할 수 없음
+  - **임시방편:** 지금은 모의 데이터로 테스트하지만 프로덕션 전에 실제 데이터 필요
 
-## Notes
-• Taking tomorrow afternoon off (dentist appointment) - Will post morning standup but limited availability after 12pm
-• Mobile responsiveness research doc started: [Link to Notion doc]
+## 노트
+• 내일 오후 휴가 (치과 약속) - 아침 스탠드업을 게시하지만 오후 12시 이후 제한된 가용성
+• 모바일 반응성 연구 문서 시작됨: [Notion 문서 링크]
 
 📎 [Sprint Board](link) | [My Active PRs](link)
 ```
 
-### Example 2: AI-Generated Standup 에서 Git History
+### 예제 2: Git 히스토리에서 AI 생성 스탠드업
 
 ```markdown
-# Standup - 2025-10-11 (Auto-generated from Git commits)
+# Standup - 2025-10-11 (Git 커밋에서 자동 생성)
 
-## Yesterday (12 commits analyzed)
-• **Feature work:** Implemented caching layer for API responses
-  - Added Redis integration (3 commits)
-  - Implemented cache invalidation logic (2 commits)
-  - Added monitoring for cache hit rates (1 commit)
-  - *Related tickets:* JIRA-567, JIRA-568
+## 어제 (12개 커밋 분석)
+• **기능 작업:** API 응답을 위한 캐싱 레이어 구현
+  - Redis 통합 추가 (3개 커밋)
+  - 캐시 무효화 로직 구현 (2개 커밋)
+  - 캐시 히트율 모니터링 추가 (1개 커밋)
+  - *관련 티켓:* JIRA-567, JIRA-568
 
-• **Bug fixes:** Resolved 3 production issues
-  - Fixed null pointer exception in user service (JIRA-601)
-  - Corrected timezone handling in reports (JIRA-615)
-  - Patched memory leak in background job processor (JIRA-622)
+• **버그 수정:** 3개 프로덕션 이슈 해결
+  - 사용자 서비스에서 null pointer exception 수정 (JIRA-601)
+  - 보고서에서 시간대 처리 수정 (JIRA-615)
+  - 백그라운드 작업 프로세서에서 메모리 누수 패치 (JIRA-622)
 
-• **Maintenance:** Updated dependencies and improved testing
-  - Upgraded Node.js to v20 LTS (2 commits)
-  - Added integration tests for payment flow (2 commits)
-  - Refactored error handling in API gateway (1 commit)
+• **유지보수:** 의존성 업데이트 및 테스트 개선
+  - Node.js를 v20 LTS로 업그레이드 (2개 커밋)
+  - 결제 플로우를 위한 통합 테스트 추가 (2개 커밋)
+  - API 게이트웨이에서 오류 처리 리팩토링 (1개 커밋)
 
-## Today (From Jira: 3 tickets in progress)
-• **JIRA-670:** Continue performance optimization work - Add database query caching
-• **JIRA-681:** Review and merge teammate PRs (5 pending reviews)
-• **JIRA-690:** Start user notification preferences UI - Design approved yesterday
+## 오늘 (Jira에서: 3개 티켓 진행 중)
+• **JIRA-670:** 성능 최적화 작업 계속 - 데이터베이스 쿼리 캐싱 추가
+• **JIRA-681:** 팀원 PR 검토 및 병합 (5개 검토 대기 중)
+• **JIRA-690:** 사용자 알림 기본 설정 UI 시작 - 어제 설계 승인됨
 
-## Blockers
-• None currently
+## 블로커
+• 현재 없음
 
 ---
-*Auto-generated from Git commits (24h) + Jira tickets. Reviewed and approved by human.*
+*Git 커밋 (24시간) + Jira 티켓에서 자동 생성. 사람이 검토하고 승인함.*
 ```
 
-### Example 3: Async Standup Template (Slack/Discord)
+### 예제 3: 비동기 스탠드업 템플릿 (Slack/Discord)
 
 ```markdown
-**🌅 Standup - Friday, Oct 11** | Posted 9:15 AM ET | @here
+**🌅 Standup - Friday, Oct 11** | 오전 9:15 ET 게시 | @here
 
-**✅ Since last update (Thu evening)**
-• Merged PR #789 - New search filters now in production 🚀
-• Closed JIRA-445 (the CSS rendering bug) - Fix deployed and verified
-• Documented API changes in Confluence - [Link]
-• Helped @alex debug the staging environment issue
+**✅ 마지막 업데이트 이후 (목요일 저녁)**
+• PR #789 병합 - 새 검색 필터가 이제 프로덕션에 있음 🚀
+• JIRA-445 종료 (CSS 렌더링 버그) - 수정 배포 및 확인됨
+• Confluence에 API 변경 사항 문서화 - [링크]
+• @alex가 스테이징 환경 이슈를 디버그하는 것을 도움
 
-**🎯 Today's focus**
-• Finish user permissions refactor (JIRA-501) - aiming for code complete by EOD
-• Deploy search performance improvements to prod (pending final QA approval)
-• Kick off spike on GraphQL migration - research phase, doc by end of day
+**🎯 오늘의 초점**
+• 사용자 권한 리팩토링 완료 (JIRA-501) - EOD까지 코드 완료 목표
+• 검색 성능 개선을 프로덕션에 배포 (최종 QA 승인 대기 중)
+• GraphQL 마이그레이션에 대한 스파이크 시작 - 연구 단계, 하루가 끝날 때까지 문서
 
-**🚧 Blockers**
-• ⚠️ Need @product approval on permissions UX before I can finish JIRA-501
-  - I've posted in #product-questions, following up in standup if no response by 11am
+**🚧 블로커**
+• ⚠️ JIRA-501을 완료하기 전에 권한 UX에 대한 @product 승인 필요
+  - #product-questions에 게시함, 오전 11시까지 응답이 없으면 스탠드업에서 후속 조치
 
-**📅 Schedule notes**
-• OOO 2-3pm for doctor appointment
-• Available for pairing this afternoon if anyone needs help!
+**📅 일정 노트**
+• 의사 약속으로 오후 2-3시 OOO
+• 누구든지 도움이 필요하면 오늘 오후 페어링 가능!
 
 ---
-React with 👀 when read | Reply in thread with questions
+읽었을 때 👀로 반응 | 질문은 스레드에 답변
 ```
 
-### Example 4: Blocker Escalation Format
+### 예제 4: 블로커 에스컬레이션 형식
 
 ```markdown
 # Standup - 2025-10-11
 
-## Yesterday
-• Continued work on data migration pipeline (JIRA-777)
-• Investigated blocker with database permissions (see below)
-• Updated migration runbook with new error handling
+## 어제
+• 데이터 마이그레이션 파이프라인 작업 계속 (JIRA-777)
+• 데이터베이스 권한으로 블로커 조사 (아래 참조)
+• 새 오류 처리로 마이그레이션 런북 업데이트
 
-## Today
-• **BLOCKED:** Cannot progress on JIRA-777 until permissions resolved
-• Will pivot to JIRA-802 (refactor user service) as backup work
-• Review PRs and help unblock teammates
+## 오늘
+• **차단됨:** 권한이 해결될 때까지 JIRA-777에서 진행할 수 없음
+• JIRA-802로 전환 (사용자 서비스 리팩토링) 백업 작업으로
+• PR 검토 및 팀원 차단 해제 도움
 
-## 🚨 CRITICAL BLOCKER
+## 🚨 중요 블로커
 
-**Issue:** Production database read access for migration dry-run
-**Blocked since:** Tuesday (3 days)
-**Impact:**
-- Cannot test migration on real data before production cutover
-- Risk of data loss if migration fails in production
-- Blocking sprint goal (migration scheduled for Monday)
+**이슈:** 마이그레이션 드라이런을 위한 프로덕션 데이터베이스 읽기 액세스
+**차단된 이후:** 화요일 (3일)
+**영향:**
+- 프로덕션 컷오버 전에 실제 데이터에서 마이그레이션을 테스트할 수 없음
+- 프로덕션에서 마이그레이션이 실패하면 데이터 손실 위험
+- 스프린트 목표 차단 (월요일에 예정된 마이그레이션)
 
-**What I need:**
-- Read-only credentials for production database replica
-- Alternative: Sanitized production data dump in staging
+**필요한 것:**
+- 프로덕션 데이터베이스 복제본에 대한 읽기 전용 자격 증명
+- 대안: 스테이징에서 정제된 프로덕션 데이터 덤프
 
-**From:** @database-team (pinged @john and @maria)
+**누구에게서:** @database-team (@john 및 @maria에게 핑함)
 
-**What I've tried:**
-- Submitted access request via IT portal (Ticket #12345) - No response
-- Asked in #database-help channel - Referred to IT portal
-- DM'd @john yesterday - Said he'd check today
+**시도한 것:**
+- IT 포털을 통해 액세스 요청 제출 (티켓 #12345) - 응답 없음
+- #database-help 채널에서 질문 - IT 포털로 안내됨
+- 어제 @john에게 DM - 오늘 확인하겠다고 함
 
-**Escalation:**
-- If not resolved by EOD today, will need to reschedule Monday migration
-- Requesting manager (@sarah) to escalate to database team lead
-- Backup plan: Proceed with staging data only (higher risk)
+**에스컬레이션:**
+- 오늘 EOD까지 해결되지 않으면 월요일 마이그레이션 일정 변경 필요
+- 매니저(@sarah)에게 데이터베이스 팀 리드에게 에스컬레이션 요청
+- 백업 계획: 스테이징 데이터만으로 진행 (더 높은 위험)
 
-**Next steps:**
-- Following up with @john at 10am
-- Will update this thread when resolved
-- If unblocked, can complete testing over weekend to stay on schedule
+**다음 단계:**
+- 오전 10시에 @john에게 후속 조치
+- 해결되면 이 스레드 업데이트 예정
+- 차단 해제되면 주말에 테스트를 완료하여 일정을 유지할 수 있음
 
 ---
 
-@sarah @john - Please prioritize, this is blocking sprint delivery
+@sarah @john - 우선순위를 정해주세요, 이것은 스프린트 전달을 차단하고 있습니다
 ```
 
-## Reference Examples
+## 참조 예제
 
-### Reference 1: Full Async Standup 워크플로우
+### 참조 1: 전체 비동기 스탠드업 워크플로우
 
-**Scenario:** 분산 team 전반에 걸쳐 US, Europe, 및 Asia timezones. No 동기 standup meetings. Daily written updates 에서 Slack #standup channel.
+**시나리오:** 미국, 유럽 및 아시아 시간대에 걸친 분산 팀. 동기 스탠드업 회의 없음. Slack #standup 채널에 매일 작성된 업데이트.
 
-**Morning Routine (30 minutes):**
+**아침 루틴 (30분):**
 
 ```bash
-# 1. Generate draft standup from data sources
+# 1. 데이터 소스에서 스탠드업 초안 생성
 git log --author="$(git config user.name)" --since="24 hours ago" --oneline
-# Review commits, note key accomplishments
+# 커밋 검토, 주요 성과 기록
 
-# 2. Check Jira tickets
+# 2. Jira 티켓 확인
 jira issues list --assignee currentUser() --status "In Progress"
-# Identify today's priorities
+# 오늘의 우선순위 식별
 
-# 3. Review Obsidian daily note from yesterday
-# Check for completed tasks, meeting outcomes
+# 3. 어제의 Obsidian 일일 노트 검토
+# 완료된 작업, 회의 결과 확인
 
-# 4. Draft standup note in Obsidian
-# File: Daily Notes/Standup/2025-10-11.md
+# 4. Obsidian에서 스탠드업 노트 초안 작성
+# 파일: Daily Notes/Standup/2025-10-11.md
 
-# 5. Review teammates' standup notes (last 8 hours)
-# Identify opportunities to help, dependencies to note
+# 5. 팀원의 스탠드업 노트 검토 (지난 8시간)
+# 도울 기회, 주목할 의존성 식별
 
-# 6. Post standup to Slack #standup channel (9:00 AM local time)
-# Copy from Obsidian, adjust formatting for Slack
+# 6. Slack #standup 채널에 스탠드업 게시 (현지 시간 오전 9:00)
+# Obsidian에서 복사, Slack용 형식 조정
 
-# 7. Set reminder to check thread responses by 11am
-# Respond to questions, offers of help
+# 7. 오전 11시까지 스레드 응답 확인하도록 리마인더 설정
+# 질문, 도움 제안에 응답
 
-# 8. Update task list with any new follow-ups from discussion
+# 8. 토론에서 새 후속 조치로 작업 목록 업데이트
 ```
 
-**Standup Note (Posted 에서 Slack):**
+**스탠드업 노트 (Slack에 게시됨):**
 
 ```markdown
-**🌄 Standup - Oct 11** | @team-backend | Read time: 2min
+**🌄 Standup - Oct 11** | @team-backend | 읽기 시간: 2분
 
-**✅ Yesterday**
-• Shipped v2 API authentication (JIRA-234) → Production deployment successful, monitoring dashboards green
-• Fixed race condition in job queue (JIRA-456) → Reduced error rate from 2% to 0.1%
-• Code review marathon: Reviewed 4 PRs from @alice, @bob, @charlie → All merged
-• Pair programming: Helped @diana debug webhook integration → Issue resolved, she's unblocked
+**✅ 어제**
+• v2 API 인증 출시 (JIRA-234) → 프로덕션 배포 성공, 모니터링 대시보드 정상
+• 작업 큐에서 경쟁 조건 수정 (JIRA-456) → 오류율을 2%에서 0.1%로 감소
+• 코드 리뷰 마라톤: @alice, @bob, @charlie의 PR 4개 검토 → 모두 병합됨
+• 페어 프로그래밍: @diana가 웹훅 통합을 디버그하는 것을 도움 → 이슈 해결, 차단 해제됨
 
-**🎯 Today**
-• **Priority 1:** Complete database migration script (JIRA-567) → Target: Code complete + tested by 3pm
-• **Priority 2:** Security audit prep → Generate access logs report for compliance team
-• **Priority 3:** Start API rate limiting implementation (JIRA-589) → Spike and design doc
-• **Meetings:** Architecture review at 11am PT, sprint planning at 2pm PT
+**🎯 오늘**
+• **우선순위 1:** 데이터베이스 마이그레이션 스크립트 완료 (JIRA-567) → 목표: 오후 3시까지 코드 완료 + 테스트됨
+• **우선순위 2:** 보안 감사 준비 → 규정 준수 팀을 위한 액세스 로그 보고서 생성
+• **우선순위 3:** API 속도 제한 구현 시작 (JIRA-589) → 스파이크 및 설계 문서
+• **회의:** 오전 11시 PT 아키텍처 검토, 오후 2시 PT 스프린트 계획
 
-**🚧 Blockers**
-• None! (Yesterday's staging env blocker was resolved by @sre-team 🙌)
+**🚧 블로커**
+• 없음! (어제의 스테이징 환경 블로커는 @sre-team이 해결함 🙌)
 
-**💡 Notes**
-• Database migration is sprint goal - will update thread when complete
-• Available for pairing this afternoon if anyone needs database help
-• Heads up: Deploying migration to staging at noon, expect ~10min downtime
+**💡 노트**
+• 데이터베이스 마이그레이션은 스프린트 목표 - 완료되면 스레드 업데이트 예정
+• 데이터베이스 도움이 필요하면 오늘 오후 페어링 가능
+• 주의: 정오에 스테이징에 마이그레이션 배포, 약 10분 다운타임 예상
 
-**🔗 Links**
+**🔗 링크**
 • [Active PRs](link) | [Sprint Board](link) | [Migration Runbook](link)
 
 ---
-👀 = I've read this | 🤝 = I can help with something | 💬 = Reply in thread
+👀 = 읽었음 | 🤝 = 무언가를 도울 수 있음 | 💬 = 스레드에 답변
 ```
 
-**Follow-Up Actions (Throughout Day):**
+**후속 조치 (하루 종일):**
 
 ```markdown
-# 11:00 AM - Check thread responses
-Thread from @eve:
-> "Can you review my DB schema changes PR before your migration? Want to make sure no conflicts"
+# 오전 11:00 - 스레드 응답 확인
+@eve의 스레드:
+> "마이그레이션 전에 내 DB 스키마 변경 PR을 검토해 줄 수 있나요? 충돌이 없는지 확인하고 싶어요"
 
-Response:
-> "Absolutely! I'll review by 1pm so you have feedback before sprint planning. Link?"
+응답:
+> "물론이죠! 스프린트 계획 전에 피드백을 받을 수 있도록 오후 1시까지 검토할게요. 링크?"
 
-# 3:00 PM - Progress update in thread
-> "✅ Update: Migration script complete and tested in staging. Dry-run successful, ready for prod deployment tomorrow. PR #892 up for review."
+# 오후 3:00 - 스레드의 진행 상황 업데이트
+> "✅ 업데이트: 마이그레이션 스크립트 완료 및 스테이징에서 테스트됨. 드라이런 성공, 내일 프로덕션 배포 준비됨. PR #892 검토 대기 중."
 
-# EOD - Tomorrow's setup
-Add to tomorrow's "Today" section:
-• Deploy database migration to production (scheduled 9am maintenance window)
-• Monitor migration + rollback plan ready
-• Post production status update in #engineering-announcements
+# EOD - 내일 설정
+내일의 "오늘" 섹션에 추가:
+• 프로덕션에 데이터베이스 마이그레이션 배포 (오전 9시 유지보수 창 예정)
+• 마이그레이션 모니터링 + 롤백 계획 준비됨
+• #engineering-announcements에 프로덕션 상태 업데이트 게시
 ```
 
-**Weekly Retrospective (Friday):**
+**주간 회고 (금요일):**
 
 ```markdown
-# Review week of standup notes
-Patterns observed:
-• ✅ Completed all 5 sprint stories
-• ⚠️ Database blocker cost 1.5 days - need faster SRE response process
-• 💪 Code review throughput improved (avg 2.5 reviews/day vs 1.5 last week)
-• 🎯 Pairing sessions very productive (3 this week) - schedule more next sprint
+# 스탠드업 노트 주간 검토
+관찰된 패턴:
+• ✅ 5개 스프린트 스토리 모두 완료
+• ⚠️ 데이터베이스 블로커가 1.5일 소요 - 더 빠른 SRE 응답 프로세스 필요
+• 💪 코드 리뷰 처리량 개선 (지난주 1.5 대 평균 2.5 검토/일)
+• 🎯  페어링 세션 매우 생산적 (이번 주 3회) - 다음 스프린트에 더 많이 예약
 
-Action items:
-• Talk to @sre-lead about expedited access request process
-• Continue pairing schedule (blocking 2hrs/week)
-• Next week: Focus on rate limiting implementation and technical debt
+액션 아이템:
+• 신속한 액세스 요청 프로세스에 대해 @sre-lead와 대화
+• 페어링 일정 계속 (주당 2시간 차단)
+• 다음 주: 속도 제한 구현 및 기술 부채에 집중
 ```
 
-### Reference 2: AI-Powered Standup Generation System
+### 참조 2: AI 기반 스탠드업 생성 시스템
 
-**System 아키텍처:**
+**시스템 아키텍처:**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Data Collection Layer                                       │
+│ 데이터 수집 레이어                                           │
 ├─────────────────────────────────────────────────────────────┤
-│ • Git commits (last 24-48h)                                 │
-│ • Jira ticket updates (status changes, comments)            │
-│ • Obsidian vault changes (daily notes, task completions)    │
-│ • Calendar events (meetings attended, upcoming)             │
-│ • Slack activity (mentions, threads participated in)        │
+│ • Git 커밋 (지난 24-48시간)                                  │
+│ • Jira 티켓 업데이트 (상태 변경, 댓글)                       │
+│ • Obsidian 볼트 변경 (일일 노트, 작업 완료)                  │
+│ • 캘린더 이벤트 (참석한 회의, 예정된 회의)                   │
+│ • Slack 활동 (멘션, 참여한 스레드)                           │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ AI Analysis & Correlation Layer                             │
+│ AI 분석 및 상관관계 레이어                                   │
 ├─────────────────────────────────────────────────────────────┤
-│ • Link commits to Jira tickets (extract ticket IDs)         │
-│ • Group related commits (same feature/bug)                  │
-│ • Extract business value from technical changes             │
-│ • Identify blockers from patterns (repeated attempts)       │
-│ • Summarize meeting notes → extract action items            │
-│ • Calculate work distribution (feature vs bug vs review)    │
+│ • 커밋을 Jira 티켓에 연결 (티켓 ID 추출)                     │
+│ • 관련 커밋 그룹화 (동일한 기능/버그)                        │
+│ • 기술적 변경에서 비즈니스 가치 추출                         │
+│ • 패턴에서 블로커 식별 (반복된 시도)                         │
+│ • 회의 노트 요약 → 액션 아이템 추출                          │
+│ • 작업 분포 계산 (기능 대 버그 대 리뷰)                      │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Generation & Formatting Layer                               │
+│ 생성 및 형식 지정 레이어                                     │
 ├─────────────────────────────────────────────────────────────┤
-│ • Generate "Yesterday" from commits + completed tickets     │
-│ • Generate "Today" from in-progress tickets + calendar      │
-│ • Flag potential blockers from context clues                │
-│ • Format for target platform (Slack/Discord/Email/Obsidian) │
-│ • Add relevant links (PRs, tickets, docs)                   │
+│ • 커밋 + 완료된 티켓에서 "어제" 생성                         │
+│ • 진행 중인 티켓 + 캘린더에서 "오늘" 생성                    │
+│ • 컨텍스트 단서에서 잠재적 블로커 플래그 지정                │
+│ • 대상 플랫폼용 형식 (Slack/Discord/Email/Obsidian)         │
+│ • 관련 링크 추가 (PR, 티켓, 문서)                            │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Human Review & Enhancement Layer                            │
+│ 사람 검토 및 향상 레이어                                     │
 ├─────────────────────────────────────────────────────────────┤
-│ • Present draft for review                                  │
-│ • Human adds context AI cannot infer                        │
-│ • Adjust priorities based on team needs                     │
-│ • Add personal notes, schedule changes                      │
-│ • Approve and post to team channel                          │
+│ • 검토를 위해 초안 제시                                      │
+│ • AI가 추론할 수 없는 컨텍스트를 사람이 추가                 │
+│ • 팀 요구에 따라 우선순위 조정                               │
+│ • 개인 노트, 일정 변경 추가                                  │
+│ • 팀 채널에 승인 및 게시                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**구현 Script:**
+**구현 스크립트:**
 
 ```bash
 #!/bin/bash
-# generate-standup.sh - AI-powered standup note generator
+# generate-standup.sh - AI 기반 스탠드업 노트 생성기
 
 DATE=$(date +%Y-%m-%d)
 USER=$(git config user.name)
 USER_EMAIL=$(git config user.email)
 
-echo "🤖 Generating standup note for $USER on $DATE..."
+echo "🤖 $DATE에 $USER를 위한 스탠드업 노트 생성 중..."
 
-# 1. Collect Git commits
-echo "📊 Analyzing Git history..."
+# 1. Git 커밋 수집
+echo "📊 Git 히스토리 분석 중..."
 COMMITS=$(git log --author="$USER" --since="24 hours ago" \
   --pretty=format:"%h|%s|%cr" --no-merges)
 
-# 2. Query Jira (requires jira CLI)
-echo "🎫 Fetching Jira tickets..."
+# 2. Jira 쿼리 (jira CLI 필요)
+echo "🎫 Jira 티켓 가져오는 중..."
 JIRA_DONE=$(jira issues list --assignee currentUser() \
   --jql "status CHANGED TO 'Done' DURING (-1d, now())" \
   --template json)
@@ -639,16 +639,16 @@ JIRA_PROGRESS=$(jira issues list --assignee currentUser() \
   --jql "status = 'In Progress'" \
   --template json)
 
-# 3. Get Obsidian recent changes (via MCP)
-echo "📝 Checking Obsidian vault..."
+# 3. Obsidian 최근 변경 사항 가져오기 (MCP를 통해)
+echo "📝 Obsidian 볼트 확인 중..."
 OBSIDIAN_CHANGES=$(obsidian_get_recent_changes --days 2)
 
-# 4. Get calendar events
-echo "📅 Fetching calendar..."
+# 4. 캘린더 이벤트 가져오기
+echo "📅 캘린더 가져오는 중..."
 MEETINGS=$(gcal --today --format=json)
 
-# 5. Send to AI for analysis and generation
-echo "🧠 Generating standup note with AI..."
+# 5. 분석 및 생성을 위해 AI에 전송
+echo "🧠 AI로 스탠드업 노트 생성 중..."
 cat << EOF > /tmp/standup-context.json
 {
   "date": "$DATE",
@@ -661,104 +661,104 @@ cat << EOF > /tmp/standup-context.json
 }
 EOF
 
-# AI prompt for standup generation
+# 스탠드업 생성을 위한 AI 프롬프트
 STANDUP_NOTE=$(claude-ai << 'PROMPT'
-Analyze the provided context and generate a concise daily standup note.
+제공된 컨텍스트를 분석하고 간결한 일일 스탠드업 노트를 생성하세요.
 
-Instructions:
-- Group related commits into single accomplishment bullets
-- Link commits to Jira tickets where possible
-- Extract business value from technical changes
-- Format as: Yesterday / Today / Blockers
-- Keep bullets concise (1-2 lines each)
-- Include relevant links to PRs and tickets
-- Flag any potential blockers based on context
+지침:
+- 관련 커밋을 단일 성과 글머리 기호로 그룹화
+- 가능한 경우 커밋을 Jira 티켓에 연결
+- 기술적 변경에서 비즈니스 가치 추출
+- 다음과 같이 형식 지정: 어제 / 오늘 / 블로커
+- 글머리 기호를 간결하게 유지 (각 1-2줄)
+- PR 및 티켓에 대한 관련 링크 포함
+- 컨텍스트를 기반으로 잠재적 블로커 플래그 지정
 
-Context: $(cat /tmp/standup-context.json)
+컨텍스트: $(cat /tmp/standup-context.json)
 
-Generate standup note in markdown format.
+마크다운 형식으로 스탠드업 노트를 생성하세요.
 PROMPT
 )
 
-# 6. Save draft to Obsidian
+# 6. Obsidian에 초안 저장
 echo "$STANDUP_NOTE" > ~/Obsidian/Standup\ Notes/$DATE.md
 
-# 7. Present for human review
-echo "✅ Draft standup note generated!"
+# 7. 사람 검토를 위해 제시
+echo "✅ 스탠드업 노트 초안 생성됨!"
 echo ""
 echo "$STANDUP_NOTE"
 echo ""
-read -p "Review the draft above. Post to Slack? (y/n) " -n 1 -r
+read -p "위의 초안을 검토하세요. Slack에 게시하시겠습니까? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    # 8. Post to Slack
+    # 8. Slack에 게시
     slack-cli chat send --channel "#standup" --text "$STANDUP_NOTE"
-    echo "📮 Posted to Slack #standup channel"
+    echo "📮 Slack #standup 채널에 게시됨"
 fi
 
-echo "💾 Saved to: ~/Obsidian/Standup Notes/$DATE.md"
+echo "💾 저장 위치: ~/Obsidian/Standup Notes/$DATE.md"
 ```
 
-**AI Prompt Template 위한 Standup Generation:**
+**스탠드업 생성을 위한 AI 프롬프트 템플릿:**
 
 ```
-You are an expert at synthesizing engineering work into clear, concise standup updates.
+당신은 엔지니어링 작업을 명확하고 간결한 스탠드업 업데이트로 합성하는 전문가입니다.
 
-Given the following data sources:
-- Git commits (last 24h)
-- Jira ticket updates
-- Obsidian daily notes
-- Calendar events
+다음 데이터 소스가 주어졌을 때:
+- Git 커밋 (지난 24시간)
+- Jira 티켓 업데이트
+- Obsidian 일일 노트
+- 캘린더 이벤트
 
-Generate a daily standup note that:
+다음을 수행하는 일일 스탠드업 노트를 생성하세요:
 
-1. **Yesterday Section:**
-   - Group related commits into single accomplishment statements
-   - Link commits to Jira tickets (extract ticket IDs from messages)
-   - Transform technical commits into business value ("Implemented X to enable Y")
-   - Include completed tickets with their status
-   - Summarize meeting outcomes from notes
+1. **어제 섹션:**
+   - 관련 커밋을 단일 성과 문장으로 그룹화
+   - 커밋을 Jira 티켓에 연결 (메시지에서 티켓 ID 추출)
+   - 기술적 커밋을 비즈니스 가치로 변환 ("Y를 가능하게 하기 위해 X 구현")
+   - 상태와 함께 완료된 티켓 포함
+   - 노트에서 회의 결과 요약
 
-2. **Today Section:**
-   - List in-progress Jira tickets with current status
-   - Include planned meetings from calendar
-   - Estimate completion for ongoing work based on commit history
-   - Prioritize by ticket priority and sprint goals
+2. **오늘 섹션:**
+   - 현재 상태와 함께 진행 중인 Jira 티켓 나열
+   - 캘린더에서 예정된 회의 포함
+   - 커밋 히스토리를 기반으로 진행 중인 작업의 완료 추정
+   - 티켓 우선순위 및 스프린트 목표로 우선순위 지정
 
-3. **Blockers Section:**
-   - Identify potential blockers from patterns:
-     * Multiple commits attempting same fix (indicates struggle)
-     * No commits on high-priority ticket (may be blocked)
-     * Comments in code mentioning "TODO" or "FIXME"
-   - Extract explicit blockers from daily notes
-   - Flag dependencies mentioned in Jira comments
+3. **블로커 섹션:**
+   - 패턴에서 잠재적 블로커 식별:
+     * 동일한 수정을 시도하는 여러 커밋 (투쟁 표시)
+     * 높은 우선순위 티켓에 대한 커밋 없음 (차단되었을 수 있음)
+     * "TODO" 또는 "FIXME"를 언급하는 코드 주석
+   - 일일 노트에서 명시적 블로커 추출
+   - Jira 댓글에 언급된 의존성 플래그 지정
 
-Format:
-- Use markdown with clear headers
-- Bullet points for each item
-- Include hyperlinks to PRs, tickets, docs
-- Keep each bullet 1-2 lines maximum
-- Add emoji for visual scanning (✅ ⚠️ 🚀 etc.)
+형식:
+- 명확한 헤더가 있는 마크다운 사용
+- 각 항목에 대한 글머리 기호
+- PR, 티켓, 문서에 대한 하이퍼링크 포함
+- 각 글머리 기호를 최대 1-2줄로 유지
+- 시각적 스캔을 위해 이모지 추가 (✅ ⚠️ 🚀 등)
 
-Tone: Professional but conversational, transparent about challenges
+톤: 전문적이지만 대화식, 도전에 대해 투명
 
-Output only the standup note markdown, no preamble.
+스탠드업 노트 마크다운만 출력, 서문 없음.
 ```
 
-**Cron Job Setup (Daily 자동화):**
+**Cron 작업 설정 (일일 자동화):**
 
 ```bash
-# Add to crontab: Run every weekday at 8:45 AM
+# crontab에 추가: 매 평일 오전 8:45에 실행
 45 8 * * 1-5 /usr/local/bin/generate-standup.sh
 
-# Sends notification when draft is ready:
-# "Your standup note is ready for review!"
-# Opens Obsidian note and prepares Slack message
+# 초안이 준비되면 알림 전송:
+# "스탠드업 노트 검토 준비 완료!"
+# Obsidian 노트를 열고 Slack 메시지 준비
 ```
 
 ---
 
-**Tool Version:** 2.0 (Upgraded 2025-10-11)
-**Target Audience:** Remote-first engineering teams, async-first organizations, 분산 teams
-**Dependencies:** Git, Jira CLI, Obsidian MCP, optional calendar 통합
-**Estimated Setup Time:** 15 minutes initial setup, 5 minutes daily routine once 자동화된
+**도구 버전:** 2.0 (2025-10-11 업그레이드됨)
+**대상:** 원격 우선 엔지니어링 팀, 비동기 우선 조직, 분산 팀
+**의존성:** Git, Jira CLI, Obsidian MCP, 선택적 캘린더 통합
+**예상 설정 시간:** 초기 설정 15분, 자동화되면 일일 루틴 5분
